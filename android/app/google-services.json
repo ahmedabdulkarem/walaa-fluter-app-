@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "63889904539",
+    "project_id": "al-walla",
+    "storage_bucket": "al-walla.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63889904539:android:0b5c854d6c8a040747073e",
+        "android_client_info": {
+          "package_name": "com.example.al_walla_team"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDD_L774memB8Thfg9ddGcnXJjLzedLhaE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
