@@ -2,6 +2,7 @@
 // WHY: Local auth — device-based super admin detection, sub-admin login via Firestore + SHA-256.
 
 import 'dart:convert';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -113,6 +114,18 @@ class AuthService {
 
   static String hashPassword(String password) {
     final bytes = utf8.encode(password);
+    final hash = sha256.convert(bytes);
+    return hash.toString();
+  }
+
+  static String generateSalt() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64Encode(bytes);
+  }
+
+  static String hashPasswordWithSalt(String password, String salt) {
+    final bytes = utf8.encode('$salt:$password');
     final hash = sha256.convert(bytes);
     return hash.toString();
   }

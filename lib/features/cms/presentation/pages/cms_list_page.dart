@@ -88,7 +88,9 @@ class _CmsListPageState extends ConsumerState<CmsListPage> {
     );
 
     if (confirmed == true) {
-      await ref.read(cmsRepositoryProvider).delete(section.id);
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+      await ref.read(cmsRepositoryProvider).delete(section.id, user);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم الحذف بنجاح')),

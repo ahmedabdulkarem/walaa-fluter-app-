@@ -4,6 +4,7 @@ import '../../../../core/utils/result.dart';
 import '../models/detachment_member_model.dart';
 import '../models/detachment_day_model.dart';
 import '../models/detachment_shift_model.dart';
+import '../models/week_day.dart';
 
 class DetachmentRepository {
   final _db = FirebaseFirestore.instance;
@@ -96,6 +97,18 @@ class DetachmentRepository {
     }
   }
 
+  Stream<List<DetachmentShiftModel>> watchAllShifts() {
+    return _db
+        .collection(_colShifts)
+        .orderBy('createdAt', descending: true)
+        .withConverter<DetachmentShiftModel>(
+          fromFirestore: DetachmentShiftModel.fromFirestore,
+          toFirestore: (model, _) => model.toFirestore(),
+        )
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
   Stream<List<DetachmentShiftModel>> watchShiftsForDay(String dayId) {
     return _db
         .collection(_colShifts)
@@ -109,28 +122,84 @@ class DetachmentRepository {
         .map((snap) => snap.docs.map((d) => d.data()).toList());
   }
 
-  Future<Result<void>> createShift(DetachmentShiftModel shift) async {
+  Stream<List<DetachmentShiftModel>> watchShiftsForWeekDay(WeekDay day) {
+    return _db
+        .collection(_colShifts)
+        .where('weekDay', isEqualTo: day.storageKey)
+        .orderBy('startTime')
+        .withConverter<DetachmentShiftModel>(
+          fromFirestore: DetachmentShiftModel.fromFirestore,
+          toFirestore: (model, _) => model.toFirestore(),
+        )
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  String? _validateShift({
+    required List<String> memberIds,
+    required String leaderId,
+    required String startTime,
+    required String endTime,
+  }) {
+    if (memberIds.isEmpty) {
+      return 'اختر عضوًا واحدًا على الأقل للشفت';
+    }
+    if (leaderId.isEmpty) {
+      return 'حدد مسؤول الشفت';
+    }
+    if (!memberIds.contains(leaderId)) {
+      return 'مسؤول الشفت يجب أن يكون أحد الأعضاء المختارين بالشفت';
+    }
+    if (startTime == endTime) {
+      return 'وقت البداية والنهاية لا يمكن أن يكونا متطابقين';
+    }
+    return null;
+  }
+
+  Future<Result<String>> createShift(DetachmentShiftModel shift) async {
+    final validationError = _validateShift(
+      memberIds: shift.memberIds,
+      leaderId: shift.leaderId,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    );
+    if (validationError != null) {
+      return FailureResult(ValidationFailure(validationError));
+    }
     try {
-      await _db
+      final ref = await _db
           .collection(_colShifts)
           .withConverter<DetachmentShiftModel>(
             fromFirestore: DetachmentShiftModel.fromFirestore,
             toFirestore: (m, _) => m.toFirestore(),
           )
           .add(shift);
-      return const Success(null);
+      return Success(ref.id);
     } catch (e) {
       return const FailureResult(ServerFailure('فشل إنشاء الشفت'));
     }
   }
 
   Future<Result<void>> updateShift(DetachmentShiftModel shift) async {
+    final validationError = _validateShift(
+      memberIds: shift.memberIds,
+      leaderId: shift.leaderId,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    );
+    if (validationError != null) {
+      return FailureResult(ValidationFailure(validationError));
+    }
     try {
       await _db.collection(_colShifts).doc(shift.uid).update({
         'shiftName': shift.shiftName,
+        'weekDay': shift.weekDay.storageKey,
         'startTime': shift.startTime,
         'endTime': shift.endTime,
         'durationHours': shift.durationHours,
+        'memberIds': shift.memberIds,
+        'memberCount': shift.memberCount,
+        'leaderId': shift.leaderId,
       });
       return const Success(null);
     } catch (e) {

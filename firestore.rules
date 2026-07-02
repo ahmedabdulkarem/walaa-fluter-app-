@@ -1,8 +1,105 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function callerAdminDoc() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isActiveAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && callerAdminDoc().isActive == true;
+    }
+
+    function isSuperAdmin() {
+      return isActiveAdmin() && callerAdminDoc().role == 'super_admin';
+    }
+
+    match /admins/{adminUid} {
+      allow read: if isSignedIn() && (request.auth.uid == adminUid || isSuperAdmin());
+      allow write: if isSuperAdmin();
+    }
+
+    match /cms_sections/{sectionId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /team_info_sections/{sectionId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+    match /team_members/{memberId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /workshops/{workshopId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+      match /staff/{staffId} {
+        allow read: if true;
+        allow write: if isActiveAdmin();
+      }
+      match /attendees/{attendeeId} {
+        allow read: if true;
+        allow write: if isActiveAdmin();
+      }
+    }
+
+    match /detachment_days/{dayId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+      match /shifts/{shiftId} {
+        allow read: if true;
+        allow write: if isActiveAdmin();
+      }
+      match /stats/{statId} {
+        allow read: if true;
+        allow write: if isActiveAdmin();
+      }
+      match /crew/{crewId} {
+        allow read: if true;
+        allow write: if isActiveAdmin();
+      }
+    }
+    match /detachment_members/{memberId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+    match /detachment_shifts/{shiftId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /support_tickets/{ticketId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow write: if isActiveAdmin();
+    }
+
+    match /applications/{appId} {
+      allow read: if isActiveAdmin();
+      allow create: if true;
+      allow update, delete: if isActiveAdmin();
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

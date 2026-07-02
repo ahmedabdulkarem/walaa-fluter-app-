@@ -450,7 +450,9 @@ class _TeamPageState extends ConsumerState<TeamPage> {
       member.isLeadership = isLeadership;
       member.sortOrder = existing?.sortOrder ?? nextSortOrder;
 
-      await repo.upsertMember(member);
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+      await repo.upsertMember(member, user);
     }
   }
 
@@ -495,7 +497,9 @@ class _TeamPageState extends ConsumerState<TeamPage> {
     );
 
     if (confirmed == true) {
-      await repo.deleteMember(member.uid);
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+      await repo.deleteMember(member.uid, user);
     }
   }
 }

@@ -7,7 +7,7 @@ class RouteNames {
   static const String splash = '/';
   static const String language = '/language';
   static const String login = '/login';
-  static const String forgotPassword = '/forgot-password';
+  static const String setup = '/setup';
   static const String sessionExpired = '/session-expired';
   static const String home = '/home';
   static const String notifications = '/notifications';

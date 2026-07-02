@@ -1,7 +1,10 @@
 // lib/shared/repositories/cms_repository.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/error/failure.dart';
+import '../../core/utils/result.dart';
 import '../models/cms_section_schema.dart';
+import '../models/user_schema.dart';
 
 class CmsRepository {
   final _db = FirebaseFirestore.instance;
@@ -27,17 +30,33 @@ class CmsRepository {
   Future<CmsSectionSchema?> getByKey(String key) async {
     final snap = await _db
         .collection('cms_sections')
-        .where('key', isEqualTo: key)
+        .doc(key)
         .get();
-    if (snap.docs.isEmpty) return null;
-    return CmsSectionSchema.fromFirestore(snap.docs.first);
+    if (!snap.exists) return null;
+    return CmsSectionSchema.fromFirestore(snap);
   }
 
-  Future<void> upsert(CmsSectionSchema section) async {
-    await _db.collection('cms_sections').doc(section.key).set(section.toFirestore());
+  Future<Result<void>> upsert(CmsSectionSchema section, UserSchema author) async {
+    if (!author.isSuperAdmin) {
+      return const FailureResult(PermissionFailure('Insufficient permissions. Only super admin can manage CMS.'));
+    }
+    try {
+      await _db.collection('cms_sections').doc(section.key).set(section.toFirestore());
+      return const Success(null);
+    } catch (e) {
+      return FailureResult(ServerFailure(e.toString()));
+    }
   }
 
-  Future<void> delete(String key) async {
-    await _db.collection('cms_sections').doc(key).delete();
+  Future<Result<void>> delete(String key, UserSchema author) async {
+    if (!author.isSuperAdmin) {
+      return const FailureResult(PermissionFailure('Insufficient permissions. Only super admin can manage CMS.'));
+    }
+    try {
+      await _db.collection('cms_sections').doc(key).delete();
+      return const Success(null);
+    } catch (e) {
+      return FailureResult(ServerFailure(e.toString()));
+    }
   }
 }

@@ -22,6 +22,9 @@ class PermissionConstants {
   // General
   static const String viewGeneralStats = 'view_general_stats';
 
+  // Team permissions
+  static const String manageTeam = 'manage_team';
+
   // All permissions list (for admin creation checklist UI)
   static const List<Map<String, String>> allPermissions = [
     {
@@ -73,6 +76,11 @@ class PermissionConstants {
       'key': viewGeneralStats,
       'labelAr': 'مشاهدة إحصائيات عامة',
       'labelEn': 'View General Stats',
+    },
+    {
+      'key': manageTeam,
+      'labelAr': 'إدارة الفريق',
+      'labelEn': 'Manage Team',
     },
   ];
 }

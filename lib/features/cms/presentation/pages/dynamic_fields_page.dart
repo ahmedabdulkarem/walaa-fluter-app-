@@ -37,8 +37,10 @@ class _DynamicFieldsPageState extends ConsumerState<DynamicFieldsPage> {
   }
 
   Future<void> _toggleActive(DynamicFieldSchema field) async {
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user == null) return;
     field.isActive = !field.isActive;
-    await ref.read(dynamicFieldRepositoryProvider).upsert(field);
+    await ref.read(dynamicFieldRepositoryProvider).upsert(field, user);
   }
 
   Future<void> _confirmDelete(DynamicFieldSchema field) async {
@@ -74,7 +76,9 @@ class _DynamicFieldsPageState extends ConsumerState<DynamicFieldsPage> {
     );
 
     if (confirmed == true) {
-      await ref.read(dynamicFieldRepositoryProvider).delete(field.id);
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+      await ref.read(dynamicFieldRepositoryProvider).delete(field.id, user);
     }
   }
 
@@ -149,6 +153,8 @@ class _DynamicFieldsPageState extends ConsumerState<DynamicFieldsPage> {
             ElevatedButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
+                final user = ref.read(currentUserProvider).valueOrNull;
+                if (user == null) return;
                 final category = _categoryKey(_selectedCategory);
                 final maxSort = 0;
                 final field = DynamicFieldSchema()
@@ -159,7 +165,7 @@ class _DynamicFieldsPageState extends ConsumerState<DynamicFieldsPage> {
                   ..sortOrder = maxSort
                   ..isActive = true;
 
-                await ref.read(dynamicFieldRepositoryProvider).upsert(field);
+                await ref.read(dynamicFieldRepositoryProvider).upsert(field, user);
                 if (!ctx.mounted) return;
                 Navigator.of(ctx).pop();
               },

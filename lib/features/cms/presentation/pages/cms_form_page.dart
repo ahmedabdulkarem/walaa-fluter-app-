@@ -106,7 +106,7 @@ class _CmsFormPageState extends ConsumerState<CmsFormPage> {
       updatedBy: user?.uid,
     );
 
-    await ref.read(cmsRepositoryProvider).upsert(section);
+    await ref.read(cmsRepositoryProvider).upsert(section, user!);
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
