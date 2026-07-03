@@ -13,6 +13,7 @@ import '../../features/detachment/presentation/pages/detachment_history_page.dar
 import '../../features/detachment/presentation/pages/detachment_day_detail_page.dart';
 import '../../features/detachment/presentation/pages/detachment_stats_page.dart';
 import '../../features/detachment/presentation/pages/detachment_days_page.dart';
+import '../../features/detachment/presentation/pages/day_shifts_page.dart';
 import '../../features/workshops/presentation/pages/workshops_list_page.dart';
 import '../../features/workshops/presentation/pages/workshop_form_page.dart';
 import '../../features/workshops/presentation/pages/workshop_detail_page.dart';
@@ -115,6 +116,16 @@ class AppRouter {
                         dayId: state.pathParameters['dayId'] ?? '',
                       ),
                       routes: [
+                        GoRoute(
+                          path: 'day-shifts/:weekDay',
+                          builder: (_, state) =>
+                              DayShiftsPage(
+                            detachmentId:
+                                state.pathParameters['dayId'] ?? '',
+                            weekDayKey:
+                                state.pathParameters['weekDay'] ?? '',
+                          ),
+                        ),
                         GoRoute(
                           path: 'stats',
                           parentNavigatorKey: _rootNavigatorKey,
