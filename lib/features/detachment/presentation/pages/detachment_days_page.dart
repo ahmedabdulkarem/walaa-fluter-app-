@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../app.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/app_app_bar.dart';
-import '../../../../core/utils/date_formatters.dart';
 import '../../../../core/utils/extensions.dart';
-import '../../../../core/localization/locale_controller.dart';
 import '../../models/detachment_day_model.dart';
-import '../../../../app.dart';
 
 class DetachmentDaysPage extends ConsumerStatefulWidget {
   const DetachmentDaysPage({super.key});
@@ -18,60 +16,11 @@ class DetachmentDaysPage extends ConsumerStatefulWidget {
 }
 
 class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
-  static const _dayNames = [
-    'الأحد',
-    'الاثنين',
-    'الثلاثاء',
-    'الأربعاء',
-    'الخميس',
-    'الجمعة',
-    'السبت',
-  ];
-
-  Future<void> _deleteDay(DetachmentDayModel day) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          'حذف اليوم',
-          style: TextStyle(fontFamily: 'Cairo'),
-        ),
-        content: Text(
-          'هل أنت متأكد من حذف يوم "${day.dayName}"؟\nسيتم حذف جميع الشفتات المرتبطة به.',
-          style: const TextStyle(fontFamily: 'Cairo'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child:
-                const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('حذف',
-                style: TextStyle(
-                    fontFamily: 'Cairo', color: AppColors.onPrimary)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    final result =
-        await ref.read(detachmentNewRepoProvider).deleteDay(day.uid);
-    if (!mounted) return;
-    result.fold(
-      (failure) => context.showSnackBar('فشل الحذف: ${failure.message}',
-          backgroundColor: AppColors.error),
-      (_) => context.showSnackBar('تم حذف اليوم'),
-    );
-  }
-
-  void _showAddDayBottomSheet() {
-    String? selectedDayName;
-    DateTime? selectedDate;
+  void _showAddDetachmentSheet() {
+    final nameCtrl = TextEditingController();
+    final leaderCtrl = TextEditingController();
+    final placeCtrl = TextEditingController();
+    final daysCtrl = TextEditingController(text: '1');
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -93,168 +42,163 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                 bottom: MediaQuery.of(ctx).viewInsets.bottom +
                     AppSizes.marginMobile,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius:
-                            BorderRadius.circular(AppSizes.radiusFull),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius:
+                              BorderRadius.circular(AppSizes.radiusFull),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  const Text(
-                    'إضافة يوم جديد',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Cairo',
-                      color: AppColors.onSurface,
+                    const SizedBox(height: AppSizes.md),
+                    const Text(
+                      'إضافة مفرزة جديدة',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Cairo',
+                        color: AppColors.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  DropdownButtonFormField<String>(
-                    hint: const Text(
-                      'اختر اسم اليوم',
-                      style: TextStyle(fontFamily: 'Cairo'),
+                    const SizedBox(height: AppSizes.md),
+                    TextField(
+                      controller: nameCtrl,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'اسم المفرزة *',
+                        prefixIcon: Icon(Icons.emergency_outlined),
+                        labelStyle: TextStyle(fontFamily: 'Cairo'),
+                        border: OutlineInputBorder(),
+                      ),
+                      style: const TextStyle(fontFamily: 'Cairo'),
                     ),
-                    items: _dayNames
-                        .map((name) => DropdownMenuItem(
-                              value: name,
-                              child: Text(name,
-                                  style:
-                                      const TextStyle(fontFamily: 'Cairo')),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setSheetState(() => selectedDayName = value);
-                    },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                              AppSizes.radiusDefault)),
+                    const SizedBox(height: AppSizes.sm),
+                    TextField(
+                      controller: leaderCtrl,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'القائد',
+                        prefixIcon: Icon(Icons.person_outline),
+                        labelStyle: TextStyle(fontFamily: 'Cairo'),
+                        border: OutlineInputBorder(),
+                      ),
+                      style: const TextStyle(fontFamily: 'Cairo'),
                     ),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setSheetState(() => selectedDate = picked);
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'التاريخ',
-                        labelStyle:
-                            const TextStyle(fontFamily: 'Cairo'),
-                        border: OutlineInputBorder(
+                    const SizedBox(height: AppSizes.sm),
+                    TextField(
+                      controller: placeCtrl,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'المكان',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                        labelStyle: TextStyle(fontFamily: 'Cairo'),
+                        border: OutlineInputBorder(),
+                      ),
+                      style: const TextStyle(fontFamily: 'Cairo'),
+                    ),
+                    const SizedBox(height: AppSizes.sm),
+                    TextField(
+                      controller: daysCtrl,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'عدد الأيام',
+                        prefixIcon: Icon(Icons.date_range_outlined),
+                        labelStyle: TextStyle(fontFamily: 'Cairo'),
+                        border: OutlineInputBorder(),
+                      ),
+                      style: const TextStyle(fontFamily: 'Cairo'),
+                    ),
+                    const SizedBox(height: AppSizes.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isSaving || nameCtrl.text.trim().isEmpty
+                            ? null
+                            : () async {
+                                setSheetState(() => isSaving = true);
+                                final user = ref
+                                    .read(currentUserProvider)
+                                    .valueOrNull;
+                                final now = DateTime.now();
+
+                                final day = DetachmentDayModel(
+                                  uid: '',
+                                  dayName: nameCtrl.text.trim(),
+                                  leaderName: leaderCtrl.text.trim().isEmpty
+                                      ? null
+                                      : leaderCtrl.text.trim(),
+                                  location: placeCtrl.text.trim(),
+                                  durationDays: int.tryParse(
+                                          daysCtrl.text.trim()) ??
+                                      1,
+                                  dayDate: now,
+                                  weekDay: now.weekday,
+                                  isActive: true,
+                                  createdAt: now,
+                                  createdBy: user?.uid ?? '',
+                                );
+
+                                final result = await ref
+                                    .read(detachmentNewRepoProvider)
+                                    .createDay(day);
+
+                                if (!ctx.mounted) return;
+                                setSheetState(() => isSaving = false);
+
+                                result.fold(
+                                  (failure) {
+                                    if (!mounted) return;
+                                    context.showSnackBar(
+                                      'فشل: ${failure.message}',
+                                      backgroundColor: AppColors.error,
+                                    );
+                                  },
+                                  (_) {
+                                    Navigator.of(ctx).pop();
+                                    if (!mounted) return;
+                                    context.showSnackBar(
+                                        'تم إنشاء المفرزة بنجاح');
+                                  },
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.onPrimary,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
-                                AppSizes.radiusDefault)),
-                        suffixIcon: const Icon(Icons.calendar_today,
-                            color: AppColors.primary),
-                      ),
-                      child: Text(
-                        selectedDate != null
-                            ? DateFormatters.formatDateLong(
-                                selectedDate!,
-                                isArabic: true)
-                            : 'اختر التاريخ',
-                        style: TextStyle(
-                          fontFamily: 'Cairo',
-                          color: selectedDate != null
-                              ? AppColors.onSurface
-                              : AppColors.onSurfaceVariant,
+                                AppSizes.radiusDefault),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.lg),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: isSaving || selectedDayName == null
-                          ? null
-                          : () async {
-                              setSheetState(() => isSaving = true);
-                              final dayDate = selectedDate ?? DateTime.now();
-                              final weekDay = dayDate.weekday;
-                              final user = ref
-                                  .read(currentUserProvider)
-                                  .valueOrNull;
-
-                              final day = DetachmentDayModel(
-                                uid: '',
-                                dayName: selectedDayName!,
-                                dayDate: dayDate,
-                                weekDay: weekDay,
-                                isActive: true,
-                                createdAt: DateTime.now(),
-                                createdBy: user?.uid ?? '',
-                              );
-
-                              final result = await ref
-                                  .read(detachmentNewRepoProvider)
-                                  .createDay(day);
-
-                              if (!ctx.mounted) return;
-                              setSheetState(() => isSaving = false);
-
-                              result.fold(
-                                (failure) {
-                                  if (!mounted) return;
-                                  context.showSnackBar(
-                                    'فشل: ${failure.message}',
-                                    backgroundColor: AppColors.error,
-                                  );
-                                },
-                                (_) {
-                                  Navigator.of(ctx).pop();
-                                  if (!mounted) return;
-                                  context.showSnackBar(
-                                      'تم إنشاء اليوم بنجاح');
-                                },
-                              );
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                              AppSizes.radiusDefault),
-                        ),
-                      ),
-                      child: isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.onPrimary),
-                            )
-                          : const Text(
-                              'حفظ',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Cairo',
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.onPrimary),
+                              )
+                            : const Text(
+                                'حفظ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Cairo',
+                                ),
                               ),
-                            ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -266,8 +210,6 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(detachmentNewRepoProvider);
-    final locale = ref.watch(localeProvider);
-    final isArabic = locale.languageCode == 'ar';
     final user = ref.watch(currentUserProvider).valueOrNull;
     final canManage = user?.can('manage_detachment') == true;
 
@@ -276,7 +218,7 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
       appBar: buildAppAppBar(context: context, title: 'المفرزة'),
       floatingActionButton: canManage
           ? FloatingActionButton(
-              onPressed: _showAddDayBottomSheet,
+              onPressed: _showAddDetachmentSheet,
               backgroundColor: AppColors.primary,
               child: const Icon(Icons.add, color: AppColors.onPrimary),
             )
@@ -304,12 +246,6 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                     style: const TextStyle(
                         fontFamily: 'Cairo', color: AppColors.error),
                   ),
-                  const SizedBox(height: AppSizes.md),
-                  OutlinedButton(
-                    onPressed: () => setState(() {}),
-                    child: const Text('إعادة المحاولة',
-                        style: TextStyle(fontFamily: 'Cairo')),
-                  ),
                 ],
               ),
             );
@@ -326,7 +262,7 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                       size: 64, color: AppColors.onSurfaceVariant),
                   const SizedBox(height: AppSizes.md),
                   const Text(
-                    'لا توجد أيام مضافة بعد',
+                    'لا توجد مفارز بعد',
                     style: TextStyle(
                       color: AppColors.onSurfaceVariant,
                       fontSize: 16,
@@ -336,10 +272,10 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                   const SizedBox(height: AppSizes.md),
                   if (canManage)
                     ElevatedButton.icon(
-                      onPressed: _showAddDayBottomSheet,
+                      onPressed: _showAddDetachmentSheet,
                       icon: const Icon(Icons.add,
                           color: AppColors.onPrimary),
-                      label: const Text('إضافة يوم',
+                      label: const Text('إضافة مفرزة',
                           style: TextStyle(fontFamily: 'Cairo')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -363,21 +299,18 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                 padding: const EdgeInsets.only(bottom: AppSizes.sm),
                 child: GestureDetector(
                   onTap: () =>
-                      context.push('/detachment/manage/${day.uid}'),
-                  onLongPress:
-                      canManage ? () => _deleteDay(day) : null,
+                      context.push('/deployments/${day.uid}'),
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius:
                           BorderRadius.circular(AppSizes.radiusMd),
                       border: Border.all(color: AppColors.border),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: AppColors.primaryContainer
-                              .withValues(alpha: 0.06),
-                          blurRadius: AppSizes.shadowBlur,
-                          offset: const Offset(0, 2),
+                          color: Color(0x0F6D28D9),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
@@ -400,7 +333,6 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: AppSizes.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -423,40 +355,67 @@ class _DetachmentDaysPageState extends ConsumerState<DetachmentDaysPage> {
                                 ),
                               ),
                             ),
-                            if (canManage) ...[
-                              const SizedBox(width: 4),
-                              InkWell(
-                                borderRadius:
-                                    BorderRadius.circular(20),
-                                onTap: () => _deleteDay(day),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4),
-                                  child: Icon(Icons.delete_outline,
-                                      size: 18,
-                                      color: AppColors.error),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                         const SizedBox(height: AppSizes.xs),
+                        if (day.leaderName != null &&
+                            day.leaderName!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person_outline,
+                                    size: 14,
+                                    color: AppColors.onSurfaceVariant),
+                                const SizedBox(width: 6),
+                                Text(
+                                  day.leaderName!,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontFamily: 'Cairo',
+                                    color: AppColors.goldBright,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (day.location.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on_outlined,
+                                    size: 14,
+                                    color: AppColors.onSurfaceVariant),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    day.location,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontFamily: 'Cairo',
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         Row(
                           children: [
-                            const Icon(Icons.calendar_today,
+                            const Icon(Icons.date_range_outlined,
                                 size: 14,
                                 color: AppColors.onSurfaceVariant),
                             const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                DateFormatters.formatDateLong(
-                                    day.dayDate,
-                                    isArabic: isArabic),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontFamily: 'Cairo',
-                                  color: AppColors.onSurfaceVariant,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              '${day.durationDays} ${day.durationDays == 1 ? 'يوم' : 'أيام'}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontFamily: 'Cairo',
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],

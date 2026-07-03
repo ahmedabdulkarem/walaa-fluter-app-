@@ -1,6 +1,3 @@
-// lib/core/routing/route_names.dart
-// WHY: Typed route name constants — prevents hardcoding paths throughout the app.
-
 class RouteNames {
   RouteNames._();
 
@@ -9,66 +6,42 @@ class RouteNames {
   static const String login = '/login';
   static const String setup = '/setup';
   static const String sessionExpired = '/session-expired';
-  static const String home = '/home';
-  static const String notifications = '/notifications';
 
-  // Posts
-  static const String posts = '/posts';
-  static const String postDetails = '/posts/:id';
-  static const String postForm = '/posts/form';
-
-  // Team
-  static const String team = '/team';
-  static const String teamLeadership = '/team/leadership';
-
-  // Detachment
-  static const String detachment = '/detachment';
-  static const String detachmentDayDetails = '/detachment/:dayId';
-  static const String detachmentForm = '/detachment/form';
-  static const String detachmentStats = '/detachment/:dayId/stats';
-  static const String detachmentHistory = '/detachment/history';
-  static const String detachmentManage = '/detachment/manage';
-  static const String detachmentManageDay = '/detachment/manage/:dayId';
-  static const String detachmentManageShift = '/detachment/manage/:dayId/shifts/:shiftId';
-
-  // Workshops
+  // === 4 Nav Branches ===
+  static const String dashboard = '/dashboard';
+  static const String deployments = '/deployments';
   static const String workshops = '/workshops';
+  static const String members = '/members';
+
+  // Deployments sub-routes
+  static const String deploymentDayDetails = '/deployments/:dayId';
+  static const String deploymentForm = '/deployments/form';
+  static const String deploymentHistory = '/deployments/history';
+
+  // Workshops sub-routes
   static const String workshopDetails = '/workshops/:id';
   static const String workshopForm = '/workshops/form';
 
-  // Admin Management
-  static const String adminManagement = '/management/admins';
-  static const String adminEdit = '/management/admins/:id/edit';
+  // Members sub-routes
+  static const String memberEdit = '/members/:id/edit';
 
-  // Support
-  static const String support = '/support';
-  static const String supportNew = '/support/new';
-  static const String supportDetails = '/support/:id';
-
-  // CMS
-  static const String cms = '/cms';
-  static const String cmsForm = '/cms/form';
-
-  // Applications
-  static const String applications = '/applications';
-  static const String applicationForm = '/apply';
-
-  // Dynamic Fields
-  static const String dynamicFields = '/dynamic-fields';
-
-  // Profile & Settings
+  // Standalone routes (outside shell)
   static const String profile = '/profile';
   static const String profileEdit = '/profile/edit';
   static const String settings = '/settings';
   static const String about = '/settings/about';
 
+  // Application form (public, outside shell)
+  static const String applicationForm = '/apply';
+
+  // Support (standalone)
+  static const String support = '/support';
+  static const String supportNew = '/support/new';
+  static const String supportDetails = '/support/:id';
+
   // Helpers
-  static String postDetailsPath(String id) => '/posts/$id';
-  static String detachmentDayPath(String dayId) => '/detachment/$dayId';
-  static String detachmentStatsPath(String dayId) => '/detachment/$dayId/stats';
-  static String detachmentManageDayPath(String dayId) => '/detachment/manage/$dayId';
-  static String detachmentManageShiftPath(String dayId, String shiftId) => '/detachment/manage/$dayId/shifts/$shiftId';
+  static String deploymentDayPath(String dayId) => '/deployments/$dayId';
   static String workshopDetailsPath(String id) => '/workshops/$id';
-  static String adminEditPath(String id) => '/management/admins/$id/edit';
+  static String memberEditPath(String id) => '/members/$id/edit';
   static String supportDetailsPath(String id) => '/support/$id';
 }

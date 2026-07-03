@@ -1,42 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
-import '../../../../core/routing/route_names.dart';
-import '../../../../shared/models/cms_section_schema.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../shared/models/user_schema.dart';
+import '../../../../shared/models/workshop_schema.dart';
+import '../../../../features/detachment/models/detachment_day_model.dart';
 import '../../../../app.dart';
 
-final _teamCountProvider = StreamProvider<int>((ref) {
-  return ref
-      .watch(teamInfoRepositoryProvider)
-      .streamMembers()
-      .map((l) => l.length);
+final _activeDeploymentsProvider = StreamProvider<List<DetachmentDayModel>>((ref) {
+  return ref.watch(detachmentNewRepoProvider).watchDays();
 });
 
-final _detachmentCountProvider = StreamProvider<int>((ref) {
-  return ref
-      .watch(detachmentRepositoryProvider)
-      .streamDays()
-      .map((l) => l.length);
+final _upcomingWorkshopsProvider = StreamProvider<List<WorkshopSchema>>((ref) {
+  return ref.watch(workshopRepositoryProvider).streamWorkshops();
 });
 
-final _workshopCountProvider = StreamProvider<int>((ref) {
-  return ref
-      .watch(workshopRepositoryProvider)
-      .streamWorkshops()
-      .map((l) => l.length);
+final _totalMembersProvider = StreamProvider<int>((ref) {
+  return ref.watch(teamInfoRepositoryProvider).streamMembers().map((l) => l.length);
 });
 
-final _supportCountProvider = StreamProvider<int>((ref) {
-  return ref
-      .watch(supportRepositoryProvider)
-      .streamAllTickets()
-      .map((l) => l.length);
-});
-
-final _cmsAboutProvider = StreamProvider<List<CmsSectionSchema>>((ref) {
-  return ref.watch(cmsRepositoryProvider).streamPublishedByType('about');
+final _subAdminsProvider = StreamProvider<List<UserSchema>>((ref) {
+  return AuthService.streamSubAdmins();
 });
 
 class HomeDashboardPage extends ConsumerWidget {
@@ -44,14 +29,16 @@ class HomeDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
+    final userAsync = ref.watch(currentUserProvider);
+    final user = userAsync.valueOrNull;
+    final isAdmin = user?.isSuperAdmin == true || (user?.can('manage') ?? false);
 
-    final teamCount = ref.watch(_teamCountProvider);
-    final detCount = ref.watch(_detachmentCountProvider);
-    final workshopCount = ref.watch(_workshopCountProvider);
-    final supportCount = ref.watch(_supportCountProvider);
+    final allDeployments = ref.watch(_activeDeploymentsProvider);
+    final allWorkshops = ref.watch(_upcomingWorkshopsProvider);
+    final totalMembers = ref.watch(_totalMembersProvider);
+    final subAdmins = ref.watch(_subAdminsProvider);
 
-    final aboutSections = ref.watch(_cmsAboutProvider).valueOrNull ?? [];
+    final now = DateTime.now();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,7 +48,7 @@ class HomeDashboardPage extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         title: const Text(
-          '\u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629',
+          'الرئيسية',
           style: TextStyle(
             color: AppColors.primary,
             fontSize: 18,
@@ -75,60 +62,66 @@ class HomeDashboardPage extends ConsumerWidget {
         slivers: [
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.md)),
 
+          // Welcome card
           SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.marginMobile),
-            sliver: SliverToBoxAdapter(
-              child: _WelcomeCard(user: user),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+            sliver: SliverToBoxAdapter(child: _WelcomeCard(user: userAsync)),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
 
+          // Summary stats
           SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.marginMobile),
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
             sliver: const SliverToBoxAdapter(
-              child: _SectionTitle(
-                  title:
-                      '\u0627\u0644\u0641\u0631\u064A\u0642 \u0628\u0627\u0644\u0623\u0631\u0642\u0627\u0645'),
+              child: _SectionTitle(title: 'نظرة عامة'),
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.sm)),
 
           SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.marginMobile),
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
             sliver: SliverGrid(
               delegate: SliverChildListDelegate([
                 _StatCard(
-                  icon: Icons.groups,
-                  label: '\u0627\u0644\u0623\u0639\u0636\u0627\u0621',
-                  accentColor: AppColors.primary,
-                  value: teamCount,
-                ),
-                _StatCard(
                   icon: Icons.emergency,
-                  label: '\u0627\u0644\u0645\u0641\u0631\u0632\u0627\u062A',
+                  label: 'المفارز النشطة',
                   accentColor: AppColors.adminPurple,
-                  value: detCount,
+                  value: allDeployments.when(
+                    data: (days) => AsyncData(days.where((d) => d.isActive).length),
+                    loading: () => const AsyncLoading(),
+                    error: (e, st) => AsyncError(e, st),
+                  ),
                 ),
                 _StatCard(
                   icon: Icons.school,
-                  label: '\u0627\u0644\u0648\u0631\u0634',
+                  label: 'الورش القادمة',
                   accentColor: AppColors.success,
-                  value: workshopCount,
+                  value: allWorkshops.when(
+                    data: (ws) => AsyncData(ws.where((w) => w.status == 'upcoming').length),
+                    loading: () => const AsyncLoading(),
+                    error: (e, st) => AsyncError(e, st),
+                  ),
                 ),
                 _StatCard(
-                  icon: Icons.headset_mic,
-                  label: '\u0627\u0644\u062F\u0639\u0645',
+                  icon: Icons.groups,
+                  label: 'الأعضاء',
+                  accentColor: AppColors.primary,
+                  value: totalMembers,
+                ),
+                _StatCard(
+                  icon: Icons.admin_panel_settings,
+                  label: 'المديرين',
                   accentColor: AppColors.goldBright,
-                  value: supportCount,
+                  value: subAdmins.when(
+                    data: (list) => AsyncData(list.length),
+                    loading: () => const AsyncLoading(),
+                    error: (e, st) => AsyncError(e, st),
+                  ),
                 ),
               ]),
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 childAspectRatio: 1.4,
                 crossAxisSpacing: AppSizes.sm,
@@ -137,111 +130,82 @@ class HomeDashboardPage extends ConsumerWidget {
             ),
           ),
 
-          if (aboutSections.isNotEmpty) ...[
-            const SliverToBoxAdapter(
-                child: SizedBox(height: AppSizes.lg)),
+          // Active deployments detail
+          if (isAdmin) ...[
+            const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.marginMobile),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final sec = aboutSections[index];
-                    return Padding(
-                      padding:
-                          const EdgeInsets.only(bottom: AppSizes.sm),
-                      child: _CmsSectionCard(section: sec),
-                    );
-                  },
-                  childCount: aboutSections.length,
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+              sliver: const SliverToBoxAdapter(
+                child: _SectionTitle(title: 'المفارز النشطة'),
               ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSizes.sm)),
+            allDeployments.when(
+              data: (days) {
+                final active = days.where((d) => d.isActive).toList();
+                if (active.isEmpty) {
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+                    sliver: SliverToBoxAdapter(
+                      child: _EmptyState(message: 'لا توجد مفارز نشطة حالياً'),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _DeploymentCard(day: active[index]),
+                      childCount: active.length > 3 ? 3 : active.length,
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SliverToBoxAdapter(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, _) => const SliverToBoxAdapter(child: SizedBox()),
             ),
           ],
 
-          const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
-
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.marginMobile),
-            sliver: const SliverToBoxAdapter(
-              child: _SectionTitle(
-                  title:
-                      '\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0633\u0631\u064A\u0639\u0629'),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: AppSizes.sm)),
-
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.marginMobile),
-            sliver: SliverGrid(
-              delegate: SliverChildListDelegate([
-                _QuickActionCard(
-                  icon: Icons.feed_outlined,
-                  label: '\u0627\u0644\u0628\u0648\u0633\u062A\u0627\u062A',
-                  onTap: () => context.go(RouteNames.posts),
-                ),
-                _QuickActionCard(
-                  icon: Icons.groups_outlined,
-                  label: '\u0627\u0644\u0641\u0631\u064A\u0642',
-                  onTap: () => context.go(RouteNames.team),
-                ),
-                _QuickActionCard(
-                  icon: Icons.emergency_outlined,
-                  label: '\u0627\u0644\u0645\u0641\u0631\u0632\u0629',
-                  onTap: () => context.go(RouteNames.detachment),
-                ),
-                _QuickActionCard(
-                  icon: Icons.school_outlined,
-                  label: '\u0627\u0644\u0648\u0631\u0634',
-                  onTap: () => context.go(RouteNames.workshops),
-                ),
-                _QuickActionCard(
-                  icon: Icons.admin_panel_settings_outlined,
-                  label:
-                      '\u0627\u0644\u0645\u062F\u064A\u0631\u064A\u0646',
-                  onTap: () =>
-                      context.push(RouteNames.adminManagement),
-                ),
-                _QuickActionCard(
-                  icon: Icons.headset_mic_outlined,
-                  label: '\u0627\u0644\u062F\u0639\u0645',
-                  onTap: () => context.push(RouteNames.support),
-                ),
-                if (user.valueOrNull?.isSuperAdmin == true) ...[
-                  _QuickActionCard(
-                    icon: Icons.article_outlined,
-                    label:
-                        '\u0627\u0644\u0645\u062D\u062A\u0648\u0649',
-                    onTap: () => context.push(RouteNames.cms),
-                  ),
-                  _QuickActionCard(
-                    icon: Icons.person_add_alt_1_outlined,
-                    label:
-                        '\u0627\u0644\u0637\u0644\u0628\u0627\u062A',
-                    onTap: () =>
-                        context.push(RouteNames.applications),
-                  ),
-                  _QuickActionCard(
-                    icon: Icons.dynamic_feed_outlined,
-                    label:
-                        '\u062D\u0642\u0648\u0644 \u062F\u064A\u0646\u0627\u0645\u064A\u0643\u064A\u0629',
-                    onTap: () =>
-                        context.push(RouteNames.dynamicFields),
-                  ),
-                ],
-              ]),
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 0.95,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+          // Upcoming workshops detail
+          if (isAdmin) ...[
+            const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+              sliver: const SliverToBoxAdapter(
+                child: _SectionTitle(title: 'الورش القادمة'),
               ),
             ),
-          ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSizes.sm)),
+            allWorkshops.when(
+              data: (ws) {
+                final upcoming = ws.where((w) =>
+                    w.dateTime != null && w.dateTime!.isAfter(now)).toList();
+                if (upcoming.isEmpty) {
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+                    sliver: SliverToBoxAdapter(
+                      child: _EmptyState(message: 'لا توجد ورش قادمة'),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _WorkshopCard(workshop: upcoming[index]),
+                      childCount: upcoming.length > 3 ? 3 : upcoming.length,
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SliverToBoxAdapter(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, _) => const SliverToBoxAdapter(child: SizedBox()),
+            ),
+          ],
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
@@ -251,7 +215,7 @@ class HomeDashboardPage extends ConsumerWidget {
 }
 
 class _WelcomeCard extends StatelessWidget {
-  final AsyncValue<dynamic> user;
+  final AsyncValue<UserSchema?> user;
   const _WelcomeCard({required this.user});
 
   @override
@@ -259,8 +223,7 @@ class _WelcomeCard extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.all(
-            Radius.circular(AppSizes.radiusMd)),
+        borderRadius: BorderRadius.all(Radius.circular(AppSizes.radiusMd)),
         boxShadow: [
           BoxShadow(
             color: Color(0x0F6D28D9),
@@ -299,19 +262,18 @@ class _WelcomeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '\u0623\u0647\u0644\u0627\u064B \u0628\u0639\u0648\u062F\u062A\u0643',
+                    'أهلاً بعودتك',
                     style: Theme.of(context)
                         .textTheme
                         .headlineMedium
                         ?.copyWith(color: AppColors.onSurface),
                   ),
                   Text(
-                    '\u0641\u0631\u064A\u0642 \u0627\u0644\u0648\u0644\u0627\u0621 \u0627\u0644\u0637\u0628\u064A',
+                    'فريق الولاء الطبي',
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium
-                        ?.copyWith(
-                            color: AppColors.onSurfaceVariant),
+                        ?.copyWith(color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -320,22 +282,19 @@ class _WelcomeCard extends StatelessWidget {
           if (user.valueOrNull?.isSuperAdmin == true) ...[
             const SizedBox(height: AppSizes.sm),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.goldLight,
-                borderRadius: BorderRadius.circular(
-                    AppSizes.radiusFull),
+                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                 border: Border.all(color: AppColors.goldBright),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.admin_panel_settings_outlined,
-                      size: 14, color: AppColors.goldDark),
+                  Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.goldDark),
                   SizedBox(width: 4),
                   Text(
-                    '\u0627\u0644\u0645\u0634\u0631\u0641 \u0627\u0644\u0639\u0627\u0645',
+                    'المشرف العام',
                     style: TextStyle(
                       color: AppColors.goldDark,
                       fontSize: 11,
@@ -387,8 +346,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.all(
-            Radius.circular(AppSizes.radiusMd)),
+        borderRadius: const BorderRadius.all(Radius.circular(AppSizes.radiusMd)),
         border: Border(
           top: BorderSide(color: accentColor, width: 3),
           left: const BorderSide(color: AppColors.border),
@@ -397,8 +355,7 @@ class _StatCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryContainer
-                .withValues(alpha: 0.06),
+            color: AppColors.primaryContainer.withValues(alpha: 0.06),
             blurRadius: AppSizes.shadowBlur,
             offset: const Offset(0, 2),
           ),
@@ -426,8 +383,7 @@ class _StatCard extends StatelessWidget {
             loading: () => const SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.primary),
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
             ),
             error: (_, _) => const Text(
               '-',
@@ -457,70 +413,70 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+class _DeploymentCard extends StatelessWidget {
+  final DetachmentDayModel day;
+  const _DeploymentCard({required this.day});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSizes.sm),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.all(
-              Radius.circular(AppSizes.radiusMd)),
-          border: Border(
-            top: BorderSide(color: AppColors.border),
-            left: BorderSide(color: AppColors.border),
-            bottom: BorderSide(color: AppColors.border),
-            right: BorderSide(color: AppColors.border),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x0F6D28D9),
-              blurRadius: AppSizes.shadowBlur,
-              offset: Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(color: AppColors.border),
         ),
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.sm, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
+                color: AppColors.adminPurple.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child:
-                  Icon(icon, size: 20, color: AppColors.primary),
+              child: const Icon(Icons.emergency, color: AppColors.adminPurple, size: 20),
             ),
-            const SizedBox(height: AppSizes.xs),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'Cairo',
-                    color: AppColors.onSurfaceVariant,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    day.dayName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  Text(
+                    '${day.memberIds.length} أعضاء',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'Cairo',
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.successLight,
+                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+              ),
+              child: const Text(
+                'نشط',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'Cairo',
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -531,71 +487,98 @@ class _QuickActionCard extends StatelessWidget {
   }
 }
 
-class _CmsSectionCard extends StatelessWidget {
-  final CmsSectionSchema section;
-  const _CmsSectionCard({required this.section});
+class _WorkshopCard extends StatelessWidget {
+  final WorkshopSchema workshop;
+  const _WorkshopCard({required this.workshop});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSizes.sm),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(color: AppColors.border),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.successLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.school, color: AppColors.success, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    workshop.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Cairo',
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (workshop.instructorName.isNotEmpty)
+                    Text(
+                      workshop.instructorName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Cairo',
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              '\$${workshop.subscriptionFee.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final String message;
+  const _EmptyState({required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.all(
-            Radius.circular(AppSizes.radiusMd)),
-        border: Border(
-          top: BorderSide(color: AppColors.border),
-          left: BorderSide(color: AppColors.border),
-          bottom: BorderSide(color: AppColors.border),
-          right: BorderSide(color: AppColors.border),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x0F6D28D9),
-            blurRadius: AppSizes.shadowBlur,
-            offset: Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.border),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (section.iconName != null &&
-                  section.iconName!.isNotEmpty)
-                const Icon(Icons.info_outline,
-                    size: 20, color: AppColors.primary),
-              const SizedBox(width: AppSizes.sm),
-              Expanded(
-                child: Text(
-                  section.titleAr,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                          color: AppColors.onSurface,
-                          fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          if (section.bodyAr.isNotEmpty) ...[
-            const SizedBox(height: AppSizes.sm),
-            Text(
-              section.bodyAr,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.6,
-                  ),
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ],
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontFamily: 'Cairo',
+          color: AppColors.onSurfaceVariant,
+          fontSize: 13,
+        ),
       ),
     );
   }

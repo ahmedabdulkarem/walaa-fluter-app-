@@ -4,6 +4,7 @@ import '../../../../core/utils/result.dart';
 import '../models/detachment_member_model.dart';
 import '../models/detachment_day_model.dart';
 import '../models/detachment_shift_model.dart';
+import '../models/detachment_patient_model.dart';
 import '../models/week_day.dart';
 
 class DetachmentRepository {
@@ -12,11 +13,26 @@ class DetachmentRepository {
   static const _colDays = 'detachment_days';
   static const _colMembers = 'detachment_members';
   static const _colShifts = 'detachment_shifts';
+  static const _colPatients = 'detachment_patients';
 
   Stream<List<DetachmentMemberModel>> watchMembers() {
     return _db
         .collection(_colMembers)
         .where('isActive', isEqualTo: true)
+        .orderBy('name')
+        .withConverter<DetachmentMemberModel>(
+          fromFirestore: DetachmentMemberModel.fromFirestore,
+          toFirestore: (model, _) => model.toFirestore(),
+        )
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  Stream<List<DetachmentMemberModel>> watchMembersForDetachment(
+      String detachmentId) {
+    return _db
+        .collection(_colMembers)
+        .where('detachmentId', isEqualTo: detachmentId)
         .orderBy('name')
         .withConverter<DetachmentMemberModel>(
           fromFirestore: DetachmentMemberModel.fromFirestore,
@@ -41,6 +57,22 @@ class DetachmentRepository {
     }
   }
 
+  Future<Result<void>> updateMember(DetachmentMemberModel member) async {
+    try {
+      await _db.collection(_colMembers).doc(member.uid).update({
+        'name': member.name,
+        'role': member.role,
+        'specialty': member.specialty,
+        'phone': member.phone,
+        'rule': member.rule,
+        'isActive': member.isActive,
+      });
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل تحديث العضو'));
+    }
+  }
+
   Future<Result<void>> deleteMember(String uid) async {
     try {
       await _db.collection(_colMembers).doc(uid).delete();
@@ -48,6 +80,27 @@ class DetachmentRepository {
     } catch (e) {
       return const FailureResult(ServerFailure('فشل حذف العضو'));
     }
+  }
+
+  Future<void> saveMemberTags({
+    required String specialty,
+    required String role,
+  }) async {
+    final batch = _db.batch();
+    for (final entry in [('specialty', specialty), ('role', role)]) {
+      final value = entry.$2.trim();
+      if (value.isEmpty) continue;
+      batch.set(
+        _db.collection('detachment_tags').doc(value),
+        {
+          'type': entry.$1,
+          'value': value,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
   }
 
   Stream<List<DetachmentDayModel>> watchDays() {
@@ -77,13 +130,31 @@ class DetachmentRepository {
     }
   }
 
+  Future<Result<void>> updateDay(DetachmentDayModel day) async {
+    try {
+      await _db.collection(_colDays).doc(day.uid).update({
+        'dayName': day.dayName,
+        'leaderName': day.leaderName,
+        'location': day.location,
+        'durationDays': day.durationDays,
+        'isActive': day.isActive,
+        'status': day.status,
+        'description': day.description,
+        'rules': day.rules,
+      });
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل تحديث المفرزة'));
+    }
+  }
+
   Future<Result<void>> deleteDay(String dayId) async {
     try {
       final batch = _db.batch();
 
       final shifts = await _db
           .collection(_colShifts)
-          .where('dayId', isEqualTo: dayId)
+          .where('detachmentId', isEqualTo: dayId)
           .get();
       for (final doc in shifts.docs) {
         batch.delete(doc.reference);
@@ -109,10 +180,11 @@ class DetachmentRepository {
         .map((snap) => snap.docs.map((d) => d.data()).toList());
   }
 
-  Stream<List<DetachmentShiftModel>> watchShiftsForDay(String dayId) {
+  Stream<List<DetachmentShiftModel>> watchShiftsForDetachment(
+      String detachmentId) {
     return _db
         .collection(_colShifts)
-        .where('dayId', isEqualTo: dayId)
+        .where('detachmentId', isEqualTo: detachmentId)
         .orderBy('startTime')
         .withConverter<DetachmentShiftModel>(
           fromFirestore: DetachmentShiftModel.fromFirestore,
@@ -120,6 +192,10 @@ class DetachmentRepository {
         )
         .snapshots()
         .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  Stream<List<DetachmentShiftModel>> watchShiftsForDay(String dayId) {
+    return watchShiftsForDetachment(dayId);
   }
 
   Stream<List<DetachmentShiftModel>> watchShiftsForWeekDay(WeekDay day) {
@@ -173,7 +249,10 @@ class DetachmentRepository {
             fromFirestore: DetachmentShiftModel.fromFirestore,
             toFirestore: (m, _) => m.toFirestore(),
           )
-          .add(shift);
+          .add(shift.copyWith(
+            attendance: Map.fromEntries(
+                shift.memberIds.map((id) => MapEntry(id, false))),
+          ));
       return Success(ref.id);
     } catch (e) {
       return const FailureResult(ServerFailure('فشل إنشاء الشفت'));
@@ -200,6 +279,8 @@ class DetachmentRepository {
         'memberIds': shift.memberIds,
         'memberCount': shift.memberCount,
         'leaderId': shift.leaderId,
+        'attendance': shift.attendance,
+        'createdBy': shift.createdBy,
       });
       return const Success(null);
     } catch (e) {
@@ -207,18 +288,15 @@ class DetachmentRepository {
     }
   }
 
-  Future<Result<void>> updateShiftMembers(
-    String shiftId,
-    List<String> memberIds,
-  ) async {
+  Future<Result<void>> toggleAttendance(
+      String shiftId, String memberId, bool isPresent) async {
     try {
       await _db.collection(_colShifts).doc(shiftId).update({
-        'memberIds': memberIds,
-        'memberCount': memberIds.length,
+        'attendance.$memberId': isPresent,
       });
       return const Success(null);
     } catch (e) {
-      return const FailureResult(ServerFailure('فشل تحديث أعضاء الشفت'));
+      return const FailureResult(ServerFailure('فشل تحديث الحضور'));
     }
   }
 
@@ -228,6 +306,109 @@ class DetachmentRepository {
       return const Success(null);
     } catch (e) {
       return const FailureResult(ServerFailure('فشل حذف الشفت'));
+    }
+  }
+
+  Future<Result<void>> updateShiftMembers(
+    String shiftId,
+    List<String> memberIds, {
+    String leaderId = '',
+  }) async {
+    try {
+      final data = <String, Object?>{
+        'memberIds': memberIds,
+        'memberCount': memberIds.length,
+      };
+      if (leaderId.isNotEmpty) {
+        data['leaderId'] = leaderId;
+      }
+      await _db.collection(_colShifts).doc(shiftId).update(data);
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل تحديث أعضاء الشفت'));
+    }
+  }
+
+  Stream<DetachmentDayModel?> watchDay(String dayId) {
+    return _db
+        .collection(_colDays)
+        .doc(dayId)
+        .withConverter<DetachmentDayModel>(
+          fromFirestore: DetachmentDayModel.fromFirestore,
+          toFirestore: (m, _) => m.toFirestore(),
+        )
+        .snapshots()
+        .map((snap) => snap.data());
+  }
+
+  Future<Result<void>> updateDayMembers(
+    String dayId,
+    List<String> memberIds,
+  ) async {
+    try {
+      await _db.collection(_colDays).doc(dayId).update({
+        'memberIds': memberIds,
+      });
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل تحديث أعضاء اليوم'));
+    }
+  }
+
+  Stream<List<DetachmentPatientModel>> watchPatientsForDay(String dayId) {
+    return watchPatientsForDetachment(dayId);
+  }
+
+  Stream<List<DetachmentPatientModel>> watchPatientsForDetachment(
+      String detachmentId) {
+    return _db
+        .collection(_colPatients)
+        .where('detachmentId', isEqualTo: detachmentId)
+        .orderBy('createdAt', descending: false)
+        .withConverter<DetachmentPatientModel>(
+          fromFirestore: DetachmentPatientModel.fromFirestore,
+          toFirestore: (m, _) => m.toFirestore(),
+        )
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.data()).toList());
+  }
+
+  Future<Result<String>> addPatient(DetachmentPatientModel patient) async {
+    try {
+      final ref = await _db
+          .collection(_colPatients)
+          .withConverter<DetachmentPatientModel>(
+            fromFirestore: DetachmentPatientModel.fromFirestore,
+            toFirestore: (m, _) => m.toFirestore(),
+          )
+          .add(patient);
+      return Success(ref.id);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل إضافة المريض'));
+    }
+  }
+
+  Future<Result<void>> updatePatient(DetachmentPatientModel patient) async {
+    try {
+      await _db.collection(_colPatients).doc(patient.uid).update({
+        'name': patient.name,
+        'age': patient.age,
+        'illness': patient.illness,
+        'status': patient.status,
+        'notes': patient.notes,
+      });
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل تحديث المريض'));
+    }
+  }
+
+  Future<Result<void>> deletePatient(String patientId) async {
+    try {
+      await _db.collection(_colPatients).doc(patientId).delete();
+      return const Success(null);
+    } catch (e) {
+      return const FailureResult(ServerFailure('فشل حذف المريض'));
     }
   }
 }

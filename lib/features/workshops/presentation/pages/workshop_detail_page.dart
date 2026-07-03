@@ -1915,18 +1915,7 @@ class _WorkshopDetailPageState extends ConsumerState<WorkshopDetailPage>
   }
 
   String _formatStaffLine(WorkshopStaffSchema s) {
-    final role = s.role ?? '';
-    final pay = s.hasPaidSubscription ? 'مدفوع' : 'غير مدفوع';
-    final att = AttendanceStatus.fromString(s.attendanceStatus);
-    final attLabel = switch (att) {
-      AttendanceStatus.notRecorded => 'لم يسجل',
-      AttendanceStatus.present => 'حاضر',
-      AttendanceStatus.absent => 'غائب',
-    };
-    final parts = [s.fullName, role, pay, attLabel]
-        .where((x) => x.isNotEmpty)
-        .join(' - ');
-    return parts;
+    return [s.uid, s.fullName].join(' - ');
   }
 
   void _copyStaffList(List<WorkshopStaffSchema> list) {
@@ -1937,29 +1926,15 @@ class _WorkshopDetailPageState extends ConsumerState<WorkshopDetailPage>
 
   void _exportStaffCsv(List<WorkshopStaffSchema> list) {
     final buffer = StringBuffer('\uFEFF');
-    buffer.writeln('الاسم,الدور,الدفع,الحالة');
+    buffer.writeln('المعرف,الاسم');
     for (final s in list) {
-      final att = AttendanceStatus.fromString(s.attendanceStatus);
-      final attLabel = switch (att) {
-        AttendanceStatus.notRecorded => 'لم يسجل',
-        AttendanceStatus.present => 'حاضر',
-        AttendanceStatus.absent => 'غائب',
-      };
-      buffer.writeln(
-          '${s.fullName},${s.role ?? ''},${s.hasPaidSubscription ? 'مدفوع' : 'غير مدفوع'},$attLabel');
+      buffer.writeln('${s.uid},${s.fullName}');
     }
     ClipboardUtils.copy(context, buffer.toString(), label: 'تم نسخ CSV');
   }
 
   String _formatAttendeeLine(WorkshopAttendeeSchema a) {
-    final pay = a.hasPaidSubscription ? 'مدفوع' : 'غير مدفوع';
-    final att = AttendanceStatus.fromString(a.attendanceStatus);
-    final attLabel = switch (att) {
-      AttendanceStatus.notRecorded => 'لم يسجل',
-      AttendanceStatus.present => 'حاضر',
-      AttendanceStatus.absent => 'غائب',
-    };
-    return [a.fullName, pay, attLabel].join(' - ');
+    return [a.uid, a.fullName].join(' - ');
   }
 
   void _copyAttendeeList(List<WorkshopAttendeeSchema> list) {
@@ -1970,16 +1945,9 @@ class _WorkshopDetailPageState extends ConsumerState<WorkshopDetailPage>
 
   void _exportAttendeeCsv(List<WorkshopAttendeeSchema> list) {
     final buffer = StringBuffer('\uFEFF');
-    buffer.writeln('الاسم,الدفع,الحالة');
+    buffer.writeln('المعرف,الاسم');
     for (final a in list) {
-      final att = AttendanceStatus.fromString(a.attendanceStatus);
-      final attLabel = switch (att) {
-        AttendanceStatus.notRecorded => 'لم يسجل',
-        AttendanceStatus.present => 'حاضر',
-        AttendanceStatus.absent => 'غائب',
-      };
-      buffer.writeln(
-          '${a.fullName},${a.hasPaidSubscription ? 'مدفوع' : 'غير مدفوع'},$attLabel');
+      buffer.writeln('${a.uid},${a.fullName}');
     }
     ClipboardUtils.copy(context, buffer.toString(), label: 'تم نسخ CSV');
   }

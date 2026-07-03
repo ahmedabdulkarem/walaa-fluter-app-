@@ -46,7 +46,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     if (success) {
       ref.read(currentUserProvider.notifier).refresh();
-      context.go(RouteNames.home);
+      context.go(RouteNames.dashboard);
     } else {
       setState(() {
         _isLoading = false;

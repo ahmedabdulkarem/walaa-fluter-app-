@@ -1,4 +1,3 @@
-// lib/core/routing/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/app_colors.dart';
@@ -9,41 +8,27 @@ import '../../features/language/presentation/pages/language_selection_page.dart'
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/widgets/session_expired_screen.dart';
 import '../../features/home/presentation/pages/home_dashboard_page.dart';
-import '../../features/posts/presentation/pages/posts_list_page.dart';
-import '../../features/posts/presentation/pages/post_form_page.dart';
-import '../../features/posts/presentation/pages/post_detail_page.dart';
-import '../../features/team/presentation/pages/team_page.dart';
-import '../../features/team/presentation/pages/team_leadership_page.dart';
-import '../../features/detachment/presentation/pages/detachment_list_page.dart';
 import '../../features/detachment/presentation/pages/detachment_form_page.dart';
 import '../../features/detachment/presentation/pages/detachment_history_page.dart';
 import '../../features/detachment/presentation/pages/detachment_day_detail_page.dart';
 import '../../features/detachment/presentation/pages/detachment_stats_page.dart';
 import '../../features/detachment/presentation/pages/detachment_days_page.dart';
-import '../../features/detachment/presentation/pages/detachment_day_shifts_page.dart';
-import '../../features/detachment/presentation/pages/shift_members_page.dart';
 import '../../features/workshops/presentation/pages/workshops_list_page.dart';
 import '../../features/workshops/presentation/pages/workshop_form_page.dart';
 import '../../features/workshops/presentation/pages/workshop_detail_page.dart';
-import '../../features/notifications/presentation/pages/notifications_page.dart';
-import '../../features/admin_management/presentation/pages/admin_list_page.dart';
+import '../../features/team/presentation/pages/team_members_page.dart';
 import '../../features/admin_management/presentation/pages/admin_edit_page.dart';
-import '../../features/support/presentation/pages/support_list_page.dart';
-import '../../features/support/presentation/pages/support_form_page.dart';
-import '../../features/support/presentation/pages/support_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/profile_edit_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/settings/presentation/pages/about_page.dart';
-import '../../features/cms/presentation/pages/cms_list_page.dart';
-import '../../features/cms/presentation/pages/cms_form_page.dart';
-import '../../features/applications/presentation/pages/application_list_page.dart';
+import '../../features/support/presentation/pages/support_list_page.dart';
+import '../../features/support/presentation/pages/support_form_page.dart';
+import '../../features/support/presentation/pages/support_detail_page.dart';
 import '../../features/applications/presentation/pages/application_form_page.dart';
-import '../../features/cms/presentation/pages/dynamic_fields_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-  static final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
   static GoRouter create({required String initialAccess}) {
     return GoRouter(
@@ -88,124 +73,127 @@ class AppRouter {
           path: RouteNames.applicationForm,
           builder: (_, _) => const ApplicationFormPage(),
         ),
-        ShellRoute(
-          navigatorKey: _shellNavigatorKey,
-          builder: (_, _, child) =>
-              HomeDashboardShell(child: child),
-          routes: [
-            GoRoute(
-              path: RouteNames.home,
-              builder: (_, _) => const HomeDashboardPage(),
-            ),
-            GoRoute(
-              path: RouteNames.posts,
-              builder: (_, _) => const PostsListPage(),
+
+        // ── 4-Branch Shell ─────────────────────────────────────
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, navigationShell) =>
+              AppShell(navigationShell: navigationShell),
+          branches: [
+            // 1. Dashboard
+            StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: 'form',
-                  builder: (_, state) => PostFormPage(
-                    post: state.extra as dynamic,
-                  ),
-                ),
-                GoRoute(
-                  path: ':id',
-                  builder: (_, state) => const PostDetailPage(),
+                  path: RouteNames.dashboard,
+                  builder: (_, _) => const HomeDashboardPage(),
                 ),
               ],
             ),
-            GoRoute(
-              path: RouteNames.team,
-              builder: (_, _) => const TeamPage(),
+
+            // 2. Deployments (مفارز)
+            StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: 'leadership',
-                  builder: (_, _) =>
-                      const TeamLeadershipPage(),
-                ),
-              ],
-            ),
-            GoRoute(
-              path: RouteNames.detachment,
-              builder: (_, _) => const DetachmentListPage(),
-              routes: [
-                GoRoute(
-                  path: 'form',
-                  builder: (_, _) =>
-                      const DetachmentFormPage(),
-                ),
-                GoRoute(
-                  path: 'history',
-                  builder: (_, _) =>
-                      const DetachmentHistoryPage(),
-                ),
-                GoRoute(
-                  path: ':dayId',
-                  builder: (_, state) =>
-                      const DetachmentDayDetailPage(),
+                  path: RouteNames.deployments,
+                  builder: (_, _) => const DetachmentDaysPage(),
                   routes: [
                     GoRoute(
-                      path: 'stats',
+                      path: 'form',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      builder: (_, _) =>
+                          const DetachmentFormPage(),
+                    ),
+                    GoRoute(
+                      path: 'history',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      builder: (_, _) =>
+                          const DetachmentHistoryPage(),
+                    ),
+                    GoRoute(
+                      path: ':dayId',
                       builder: (_, state) =>
-                          const DetachmentStatsPage(),
+                          DetachmentDayDetailPage(
+                        dayId: state.pathParameters['dayId'] ?? '',
+                      ),
+                      routes: [
+                        GoRoute(
+                          path: 'stats',
+                          parentNavigatorKey: _rootNavigatorKey,
+                          pageBuilder: (_, state) =>
+                              NoTransitionPage(
+                            child:
+                                const DetachmentStatsPage(),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-            GoRoute(
-              path: RouteNames.workshops,
-              builder: (_, _) =>
-                  const WorkshopsListPage(),
+
+            // 3. Workshops (ورشات)
+            StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: 'form',
-                  builder: (_, state) => WorkshopFormPage(
-                    workshop: state.extra as dynamic,
-                  ),
+                  path: RouteNames.workshops,
+                  builder: (_, _) => const WorkshopsListPage(),
+                  routes: [
+                    GoRoute(
+                      path: 'form',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      builder: (_, state) => WorkshopFormPage(
+                        workshop: state.extra as dynamic,
+                      ),
+                    ),
+                    GoRoute(
+                      path: ':id',
+                      builder: (_, state) => WorkshopDetailPage(
+                        id: state.pathParameters['id'] ?? '',
+                      ),
+                    ),
+                  ],
                 ),
+              ],
+            ),
+
+            // 4. Members & Permissions (الأعضاء والصلاحيات)
+            StatefulShellBranch(
+              routes: [
                 GoRoute(
-                  path: ':id',
-                  builder: (_, state) => WorkshopDetailPage(
-                    id: state.pathParameters['id'] ?? '',
-                  ),
+                  path: RouteNames.members,
+                  builder: (_, _) => const TeamMembersPage(),
+                  routes: [
+                    GoRoute(
+                      path: ':id/edit',
+                      parentNavigatorKey: _rootNavigatorKey,
+                      builder: (_, state) => AdminEditPage(
+                        adminId:
+                            state.pathParameters['id'] ?? '',
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
         ),
+
+        // ── Standalone routes ──────────────────────────────────
         GoRoute(
-          path: RouteNames.notifications,
-          builder: (_, _) => const NotificationsPage(),
+          path: RouteNames.profile,
+          builder: (_, _) => const ProfilePage(),
         ),
         GoRoute(
-          path: RouteNames.detachmentManage,
-          builder: (_, _) => const DetachmentDaysPage(),
-          routes: [
-            GoRoute(
-              path: ':dayId',
-              builder: (_, state) =>
-                  const DetachmentDayShiftsPage(),
-              routes: [
-                GoRoute(
-                  path: 'shifts/:shiftId',
-                  builder: (_, state) =>
-                      const ShiftMembersPage(),
-                ),
-              ],
-            ),
-          ],
+          path: RouteNames.profileEdit,
+          builder: (_, _) => const ProfileEditPage(),
         ),
         GoRoute(
-          path: RouteNames.adminManagement,
-          builder: (_, _) => const AdminListPage(),
-          routes: [
-            GoRoute(
-              path: ':id/edit',
-              builder: (_, state) => AdminEditPage(
-                adminId: state.pathParameters['id'] ?? '',
-              ),
-            ),
-          ],
+          path: RouteNames.settings,
+          builder: (_, _) => const SettingsPage(),
+        ),
+        GoRoute(
+          path: RouteNames.about,
+          builder: (_, _) => const AboutPage(),
         ),
         GoRoute(
           path: RouteNames.support,
@@ -223,59 +211,20 @@ class AppRouter {
             ),
           ],
         ),
-        GoRoute(
-          path: RouteNames.profile,
-          builder: (_, _) => const ProfilePage(),
-          routes: [
-            GoRoute(
-              path: 'edit',
-              builder: (_, _) => const ProfileEditPage(),
-            ),
-          ],
-        ),
-        GoRoute(
-          path: RouteNames.settings,
-          builder: (_, _) => const SettingsPage(),
-          routes: [
-            GoRoute(
-              path: 'about',
-              builder: (_, _) => const AboutPage(),
-            ),
-          ],
-        ),
-        GoRoute(
-          path: RouteNames.cms,
-          builder: (_, _) => const CmsListPage(),
-          routes: [
-            GoRoute(
-              path: 'form',
-              builder: (_, state) => CmsFormPage(
-                sectionKey: state.extra as String?,
-              ),
-            ),
-          ],
-        ),
-        GoRoute(
-          path: RouteNames.applications,
-          builder: (_, _) => const ApplicationListPage(),
-        ),
-        GoRoute(
-          path: RouteNames.dynamicFields,
-          builder: (_, _) => const DynamicFieldsPage(),
-        ),
       ],
     );
   }
 }
 
-class HomeDashboardShell extends StatelessWidget {
-  final Widget child;
-  const HomeDashboardShell({super.key, required this.child});
+class AppShell extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
+
+  const AppShell({super.key, required this.navigationShell});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: child,
+      body: navigationShell,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
@@ -283,8 +232,10 @@ class HomeDashboardShell extends StatelessWidget {
               top: BorderSide(color: AppColors.divider)),
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex(context),
-          onTap: (index) => _onTap(context, index),
+          currentIndex: navigationShell.currentIndex,
+          onTap: (index) =>
+              navigationShell.goBranch(index,
+                  initialLocation: index == navigationShell.currentIndex),
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedItemColor: AppColors.primary,
@@ -302,62 +253,28 @@ class HomeDashboardShell extends StatelessWidget {
           ),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
               label: 'الرئيسية',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.feed_outlined),
-              activeIcon: Icon(Icons.feed),
-              label: 'البوستات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.groups_outlined),
-              activeIcon: Icon(Icons.groups),
-              label: 'الفريق',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.emergency_outlined),
               activeIcon: Icon(Icons.emergency),
-              label: 'المفرزة',
+              label: 'مفارز',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.school_outlined),
               activeIcon: Icon(Icons.school),
-              label: 'الورش',
+              label: 'ورشات',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
+              label: 'الأعضاء',
             ),
           ],
         ),
       ),
     );
-  }
-
-  int _currentIndex(BuildContext context) {
-    final path = GoRouterState.of(context).uri.path;
-    if (path.startsWith('/posts')) return 1;
-    if (path.startsWith('/team')) return 2;
-    if (path.startsWith('/detachment')) return 3;
-    if (path.startsWith('/workshops')) return 4;
-    return 0;
-  }
-
-  void _onTap(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        context.go(RouteNames.home);
-        break;
-      case 1:
-        context.go(RouteNames.posts);
-        break;
-      case 2:
-        context.go(RouteNames.team);
-        break;
-      case 3:
-        context.go(RouteNames.detachment);
-        break;
-      case 4:
-        context.go(RouteNames.workshops);
-        break;
-    }
   }
 }

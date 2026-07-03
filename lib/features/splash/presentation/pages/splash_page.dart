@@ -24,7 +24,7 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
     if (widget.initialAccess == 'super_admin' ||
         widget.initialAccess == 'sub_admin') {
-      GoRouter.of(context).go(RouteNames.home);
+      GoRouter.of(context).go(RouteNames.dashboard);
     } else {
       GoRouter.of(context).go(RouteNames.login);
     }

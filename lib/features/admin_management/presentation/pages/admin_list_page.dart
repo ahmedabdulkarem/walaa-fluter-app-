@@ -67,7 +67,7 @@ class _AdminListPageState extends ConsumerState<AdminListPage> {
                 padding: const EdgeInsets.only(bottom: AppSizes.sm),
                 child: AppCard(
                   onTap: () =>
-                      context.push(RouteNames.adminEditPath(admin.uid)),
+                      context.push(RouteNames.memberEditPath(admin.uid)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

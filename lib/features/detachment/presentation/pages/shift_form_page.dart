@@ -7,6 +7,11 @@ import '../../models/detachment_shift_model.dart';
 import '../../models/detachment_member_model.dart';
 import '../../models/week_day.dart';
 
+final detachmentMembersProvider =
+    StreamProvider<List<DetachmentMemberModel>>((ref) {
+  return ref.read(detachmentNewRepoProvider).watchMembers();
+});
+
 class ShiftFormPage extends ConsumerStatefulWidget {
   final DetachmentShiftModel? initialShift;
   const ShiftFormPage({super.key, this.initialShift});
@@ -137,7 +142,7 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
 
     final shift = DetachmentShiftModel(
       uid: widget.initialShift?.uid ?? '',
-      dayId: widget.initialShift?.dayId ?? '',
+      detachmentId: widget.initialShift?.detachmentId ?? '',
       weekDay: _selectedDay,
       shiftName: _nameController.text.trim(),
       startTime: startTime,
@@ -172,7 +177,7 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(detachmentNewRepoProvider).watchMembers();
+    final membersAsync = ref.watch(detachmentMembersProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -323,22 +328,15 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
               style: const TextStyle(fontFamily: 'Cairo'),
             ),
             const SizedBox(height: AppSizes.sm),
-            StreamBuilder<List<DetachmentMemberModel>>(
-              stream: membersAsync,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.primary));
-                }
-                if (snapshot.hasError) {
-                  return Text('تعذر تحميل الأعضاء: ${snapshot.error}',
-                      style: const TextStyle(
-                          fontFamily: 'Cairo',
-                          color: AppColors.error));
-                }
-                final allMembers = snapshot.data ?? [];
+            membersAsync.when(
+              loading: () => const Center(
+                  child: CircularProgressIndicator(
+                      color: AppColors.primary)),
+              error: (e, _) => Text('تعذر تحميل الأعضاء: $e',
+                  style: const TextStyle(
+                      fontFamily: 'Cairo',
+                      color: AppColors.error)),
+              data: (allMembers) {
                 final query = _searchController.text.trim();
                 final filtered = query.isEmpty
                     ? allMembers
@@ -347,17 +345,17 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
                             m.name.toLowerCase().contains(
                                 query.toLowerCase()))
                         .toList();
-
                 if (filtered.isEmpty) {
                   return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    padding:
+                        EdgeInsets.symmetric(vertical: 16),
                     child: Text('لا يوجد أعضاء مطابقين',
                         style: TextStyle(
                             fontFamily: 'Cairo',
-                            color: AppColors.onSurfaceVariant)),
+                            color:
+                                AppColors.onSurfaceVariant)),
                   );
                 }
-
                 return Column(
                   children: filtered.map((m) {
                     final selected =
@@ -367,8 +365,8 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
                           ? AppColors.primarySurface
                           : AppColors.surface,
                       elevation: 0,
-                      margin:
-                          const EdgeInsets.only(bottom: AppSizes.xs),
+                      margin: const EdgeInsets.only(
+                          bottom: AppSizes.xs),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                             AppSizes.radiusMd),
@@ -404,8 +402,9 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
                         ),
                         onChanged: (v) =>
                             _toggleMember(m.uid, v ?? false),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.md),
+                        contentPadding:
+                            const EdgeInsets.symmetric(
+                                horizontal: AppSizes.md),
                       ),
                     );
                   }).toList(),
@@ -419,14 +418,13 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
                     fontWeight: FontWeight.w600,
                     color: AppColors.onSurface)),
             const SizedBox(height: AppSizes.xs),
-            StreamBuilder<List<DetachmentMemberModel>>(
-              stream: membersAsync,
-              builder: (context, snapshot) {
-                final allMembers = snapshot.data ?? [];
+            membersAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+              data: (allMembers) {
                 final selectedMembers = allMembers
                     .where((m) => _selectedMemberIds.contains(m.uid))
                     .toList();
-
                 if (selectedMembers.isEmpty) {
                   return const Text(
                     'اختر الأعضاء أولًا حتى تقدر تحدد مسؤول الشفت',
@@ -436,7 +434,6 @@ class _ShiftFormPageState extends ConsumerState<ShiftFormPage> {
                         fontSize: 13),
                   );
                 }
-
                 return DropdownButtonFormField<String>(
                   hint: const Text('اختر المسؤول',
                       style: TextStyle(fontFamily: 'Cairo')),
