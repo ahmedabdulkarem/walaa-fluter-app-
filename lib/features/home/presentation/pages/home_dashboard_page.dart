@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
-import '../../../../core/services/auth_service.dart';
 import '../../../../shared/models/user_schema.dart';
 import '../../../../shared/models/workshop_schema.dart';
 import '../../../../features/detachment/models/detachment_day_model.dart';
@@ -16,14 +16,6 @@ final _upcomingWorkshopsProvider = StreamProvider<List<WorkshopSchema>>((ref) {
   return ref.watch(workshopRepositoryProvider).streamWorkshops();
 });
 
-final _totalMembersProvider = StreamProvider<int>((ref) {
-  return ref.watch(teamInfoRepositoryProvider).streamMembers().map((l) => l.length);
-});
-
-final _subAdminsProvider = StreamProvider<List<UserSchema>>((ref) {
-  return AuthService.streamSubAdmins();
-});
-
 class HomeDashboardPage extends ConsumerWidget {
   const HomeDashboardPage({super.key});
 
@@ -35,8 +27,6 @@ class HomeDashboardPage extends ConsumerWidget {
 
     final allDeployments = ref.watch(_activeDeploymentsProvider);
     final allWorkshops = ref.watch(_upcomingWorkshopsProvider);
-    final totalMembers = ref.watch(_totalMembersProvider);
-    final subAdmins = ref.watch(_subAdminsProvider);
 
     final now = DateTime.now();
 
@@ -62,75 +52,49 @@ class HomeDashboardPage extends ConsumerWidget {
         slivers: [
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.md)),
 
-          // Welcome card
+          // Header
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
-            sliver: SliverToBoxAdapter(child: _WelcomeCard(user: userAsync)),
+            sliver: SliverToBoxAdapter(child: _HeaderCard(user: userAsync)),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
 
-          // Summary stats
+          // Quick access
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
             sliver: const SliverToBoxAdapter(
-              child: _SectionTitle(title: 'نظرة عامة'),
+              child: _SectionTitle(title: 'الوصول السريع'),
             ),
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: AppSizes.sm)),
-
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.marginMobile),
             sliver: SliverGrid(
-              delegate: SliverChildListDelegate([
-                _StatCard(
+              delegate: SliverChildListDelegate(const [
+                _QuickAccessCard(
                   icon: Icons.emergency,
-                  label: 'المفارز النشطة',
+                  label: 'المفارز',
                   accentColor: AppColors.adminPurple,
-                  value: allDeployments.when(
-                    data: (days) => AsyncData(days.where((d) => d.isActive).length),
-                    loading: () => const AsyncLoading(),
-                    error: (e, st) => AsyncError(e, st),
-                  ),
+                  route: '/deployments',
                 ),
-                _StatCard(
+                _QuickAccessCard(
                   icon: Icons.school,
-                  label: 'الورش القادمة',
+                  label: 'الورش',
                   accentColor: AppColors.success,
-                  value: allWorkshops.when(
-                    data: (ws) => AsyncData(ws.where((w) => w.status == 'upcoming').length),
-                    loading: () => const AsyncLoading(),
-                    error: (e, st) => AsyncError(e, st),
-                  ),
-                ),
-                _StatCard(
-                  icon: Icons.groups,
-                  label: 'الأعضاء',
-                  accentColor: AppColors.primary,
-                  value: totalMembers,
-                ),
-                _StatCard(
-                  icon: Icons.admin_panel_settings,
-                  label: 'المديرين',
-                  accentColor: AppColors.goldBright,
-                  value: subAdmins.when(
-                    data: (list) => AsyncData(list.length),
-                    loading: () => const AsyncLoading(),
-                    error: (e, st) => AsyncError(e, st),
-                  ),
+                  route: '/workshops',
                 ),
               ]),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 1.4,
+                childAspectRatio: 2.2,
                 crossAxisSpacing: AppSizes.sm,
                 mainAxisSpacing: AppSizes.sm,
               ),
             ),
           ),
 
-          // Active deployments detail
+          // Active deployments
           if (isAdmin) ...[
             const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
             SliverPadding(
@@ -168,7 +132,7 @@ class HomeDashboardPage extends ConsumerWidget {
             ),
           ],
 
-          // Upcoming workshops detail
+          // Upcoming workshops
           if (isAdmin) ...[
             const SliverToBoxAdapter(child: SizedBox(height: AppSizes.lg)),
             SliverPadding(
@@ -214,9 +178,9 @@ class HomeDashboardPage extends ConsumerWidget {
   }
 }
 
-class _WelcomeCard extends StatelessWidget {
+class _HeaderCard extends StatelessWidget {
   final AsyncValue<UserSchema?> user;
-  const _WelcomeCard({required this.user});
+  const _HeaderCard({required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +276,62 @@ class _WelcomeCard extends StatelessWidget {
   }
 }
 
+class _QuickAccessCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color accentColor;
+  final String route;
+
+  const _QuickAccessCard({
+    required this.icon,
+    required this.label,
+    required this.accentColor,
+    required this.route,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.go(route),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.all(Radius.circular(AppSizes.radiusMd)),
+          border: Border(
+            top: BorderSide(color: accentColor, width: 3),
+            left: const BorderSide(color: AppColors.border),
+            bottom: const BorderSide(color: AppColors.border),
+            right: const BorderSide(color: AppColors.border),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryContainer.withValues(alpha: 0.06),
+              blurRadius: AppSizes.shadowBlur,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: accentColor, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   final String title;
   const _SectionTitle({required this.title});
@@ -328,91 +348,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color accentColor;
-  final AsyncValue<int> value;
-
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.accentColor,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(AppSizes.radiusMd)),
-        border: Border(
-          top: BorderSide(color: accentColor, width: 3),
-          left: const BorderSide(color: AppColors.border),
-          bottom: const BorderSide(color: AppColors.border),
-          right: const BorderSide(color: AppColors.border),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryContainer.withValues(alpha: 0.06),
-            blurRadius: AppSizes.shadowBlur,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: accentColor, size: 28),
-          const SizedBox(height: 8),
-          value.when(
-            data: (v) => TweenAnimationBuilder<int>(
-              tween: IntTween(begin: 0, end: v),
-              duration: const Duration(milliseconds: 800),
-              builder: (_, val, _) => Text(
-                '$val',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'Cairo',
-                  color: AppColors.onSurface,
-                ),
-              ),
-            ),
-            loading: () => const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-            ),
-            error: (_, _) => const Text(
-              '-',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                fontFamily: 'Cairo',
-                color: AppColors.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'Cairo',
-              color: AppColors.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DeploymentCard extends StatelessWidget {
   final DetachmentDayModel day;
   const _DeploymentCard({required this.day});
@@ -421,66 +356,69 @@ class _DeploymentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSizes.sm),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.adminPurple.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+      child: GestureDetector(
+        onTap: () => context.push('/deployments/${day.uid}'),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.adminPurple.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.emergency, color: AppColors.adminPurple, size: 20),
               ),
-              child: const Icon(Icons.emergency, color: AppColors.adminPurple, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    day.dayName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontFamily: 'Cairo',
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      day.dayName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontFamily: 'Cairo',
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurface,
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${day.memberIds.length} أعضاء',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'Cairo',
-                      color: AppColors.onSurfaceVariant,
+                    Text(
+                      '${day.memberIds.length} أعضاء',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Cairo',
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.successLight,
-                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              ),
-              child: const Text(
-                'نشط',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'Cairo',
-                  color: AppColors.success,
-                  fontWeight: FontWeight.w500,
+                  ],
                 ),
               ),
-            ),
-          ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.successLight,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                ),
+                child: const Text(
+                  'نشط',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'Cairo',
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

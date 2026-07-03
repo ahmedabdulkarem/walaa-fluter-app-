@@ -7,11 +7,10 @@ class RouteNames {
   static const String setup = '/setup';
   static const String sessionExpired = '/session-expired';
 
-  // === 4 Nav Branches ===
+  // === 3 Nav Branches ===
   static const String dashboard = '/dashboard';
   static const String deployments = '/deployments';
   static const String workshops = '/workshops';
-  static const String members = '/members';
 
   // Deployments sub-routes
   static const String deploymentDayDetails = '/deployments/:dayId';
@@ -21,9 +20,6 @@ class RouteNames {
   // Workshops sub-routes
   static const String workshopDetails = '/workshops/:id';
   static const String workshopForm = '/workshops/form';
-
-  // Members sub-routes
-  static const String memberEdit = '/members/:id/edit';
 
   // Standalone routes (outside shell)
   static const String profile = '/profile';
@@ -42,6 +38,5 @@ class RouteNames {
   // Helpers
   static String deploymentDayPath(String dayId) => '/deployments/$dayId';
   static String workshopDetailsPath(String id) => '/workshops/$id';
-  static String memberEditPath(String id) => '/members/$id/edit';
   static String supportDetailsPath(String id) => '/support/$id';
 }

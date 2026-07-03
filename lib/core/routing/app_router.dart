@@ -17,8 +17,6 @@ import '../../features/detachment/presentation/pages/day_shifts_page.dart';
 import '../../features/workshops/presentation/pages/workshops_list_page.dart';
 import '../../features/workshops/presentation/pages/workshop_form_page.dart';
 import '../../features/workshops/presentation/pages/workshop_detail_page.dart';
-import '../../features/team/presentation/pages/team_members_page.dart';
-import '../../features/admin_management/presentation/pages/admin_edit_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/profile_edit_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
@@ -75,7 +73,7 @@ class AppRouter {
           builder: (_, _) => const ApplicationFormPage(),
         ),
 
-        // ── 4-Branch Shell ─────────────────────────────────────
+        // 3-Branch Shell
         StatefulShellRoute.indexedStack(
           builder: (_, _, navigationShell) =>
               AppShell(navigationShell: navigationShell),
@@ -166,30 +164,10 @@ class AppRouter {
                 ),
               ],
             ),
-
-            // 4. Members & Permissions (الأعضاء والصلاحيات)
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: RouteNames.members,
-                  builder: (_, _) => const TeamMembersPage(),
-                  routes: [
-                    GoRoute(
-                      path: ':id/edit',
-                      parentNavigatorKey: _rootNavigatorKey,
-                      builder: (_, state) => AdminEditPage(
-                        adminId:
-                            state.pathParameters['id'] ?? '',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ],
         ),
 
-        // ── Standalone routes ──────────────────────────────────
+        // Standalone routes
         GoRoute(
           path: RouteNames.profile,
           builder: (_, _) => const ProfilePage(),
@@ -277,11 +255,6 @@ class AppShell extends StatelessWidget {
               icon: Icon(Icons.school_outlined),
               activeIcon: Icon(Icons.school),
               label: 'ورشات',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'الأعضاء',
             ),
           ],
         ),
